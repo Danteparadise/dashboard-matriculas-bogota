@@ -29,66 +29,78 @@ st.markdown("---")
 # 2. CARGA Y LIMPIEZA AUTOMÁTICA DE DATOS REALES
 # ==============================================================================
 try:
-    # Carga con los parámetros latinoamericanos validados
     df = pd.read_csv("matriculados_bogota_2025.csv", encoding="latin-1", sep=";")
-    
-    # Limpieza institucional de nombres de columnas (eliminar espacios invisibles de Excel)
     df.columns = df.columns.str.strip()
-    
-    # Eliminar columnas vacías fantasmas como 'Unnamed: 41' si existen
     df = df.loc[:, ~df.columns.str.contains('^Unnamed')]
 
-    # Mapeo estricto de las columnas validadas en el Inspector
+    # Definición estricta de las columnas de tu matriz oficial
     col_sector = 'SECTOR IES'
     col_sexo = 'SEXO'
     col_matriculados = 'MATRICULADOS'
     
-    # Identificar columna de Área o Programa de forma flexible
-    col_area = next((c for c in df.columns if 'CINE' in c or 'ÁREA' in c or 'AREA' in c or 'NIVEL DE FORMACIÓN' in c), None)
+    # Identificar de forma segura las nuevas columnas de segmentación
+    col_nivel = next((c for c in df.columns if 'NIVEL DE FORMACIÓN' in c or 'NIVEL ACADÉMICO' in c), None)
+    col_modalidad = next((c for c in df.columns if 'MODALIDAD' in c or 'METODOLOGÍA' in c), None)
+    col_area = next((c for c in df.columns if 'CINE' in c or 'ÁREA' in c or 'AREA' in c), None)
+    
     if not col_area:
-        col_area = 'PROGRAMA ACADÉMICO' if 'PROGRAMA ACADÉMICO' in df.columns else df.columns[2]
+        col_area = 'PROGRAMA ACADÉMICO' if 'PROGRAMA ACADÉMICO' in df.columns else df.columns[0]
 
-    # Convertir la columna de estudiantes a número de forma segura
+    # Convertir matrícula a número seguro
     df[col_matriculados] = pd.to_numeric(df[col_matriculados], errors='coerce').fillna(0)
 
     # ==============================================================================
-    # 3. BARRA LATERAL (Filtros Avanzados)
+    # 3. BARRA LATERAL (Filtros Avanzados Múltiples)
     # ==============================================================================
     st.sidebar.header("Filtros del Modelo")
     st.sidebar.markdown("Filtre la población bajo estudio en tiempo real.")
 
-    # Filtro Dinámico 1: Sector IES (Oficial / Privado)
+    # Filtro 1: Sector IES
     opciones_sector = sorted(df[col_sector].dropna().unique().tolist())
     selected_sector = st.sidebar.multiselect("Sector de la Institución", opciones_sector, default=opciones_sector)
 
-    # Filtro Dinámico 2: Sexo
+    # Filtro 2: Género / Sexo
     opciones_sexo = sorted(df[col_sexo].dropna().unique().tolist())
     selected_sexo = st.sidebar.multiselect("Género / Sexo", opciones_sexo, default=opciones_sexo)
 
-    # Aplicación estricta de filtros sobre la matriz original
-    df_filtered = df[
-        (df[col_sector].isin(selected_sector)) & 
-        (df[col_sexo].isin(selected_sexo))
-    ]
-
-    # Verificar si el filtro dejó datos vacíos
-    if df_filtered.empty:
-        st.warning("No hay registros que coincidan con la combinación de filtros seleccionada.")
+    # Filtro En cascada 3: Nivel de Formación (Pregrado, Maestría, Doctorado, etc.)
+    if col_nivel:
+        opciones_nivel = sorted(df[col_nivel].dropna().unique().tolist())
+        selected_nivel = st.sidebar.multiselect("Nivel de Formación", opciones_nivel, default=opciones_nivel)
     else:
-        # ==============================================================================
-        # 4. CUERPO PRINCIPAL Y VISUALIZACIONES
-        # ==============================================================================
+        selected_nivel = []
+
+    # Filtro En cascada 4: Modalidad (Presencial, Virtual, A distancia, etc.)
+    if col_modalidad:
+        opciones_modalidad = sorted(df[col_modalidad].dropna().unique().tolist())
+        selected_modalidad = st.sidebar.multiselect("Modalidad de Estudio", opciones_modalidad, default=opciones_modalidad)
+    else:
+        selected_modalidad = []
+
+    # --- Aplicación de la Máscara Booleana de Filtros Coincidentes ---
+    mask = (df[col_sector].isin(selected_sector)) & (df[col_sexo].isin(selected_sexo))
+    if col_nivel and selected_nivel:
+        mask = mask & (df[col_nivel].isin(selected_nivel))
+    if col_modalidad and selected_modalidad:
+        mask = mask & (df[col_modalidad].isin(selected_modalidad))
+        
+    df_filtered = df[mask]
+
+    # ==============================================================================
+    # 4. CUERPO PRINCIPAL Y VISUALIZACIONES
+    # ==============================================================================
+    if df_filtered.empty:
+        st.warning("No hay registros que coincidan con la combinación de filtros seleccionada. Intente flexibilizar los parámetros.")
+    else:
         # Fila de KPIs de Alto Impacto
         kpi1, kpi2, kpi3, kpi4 = st.columns(4)
         
         total_matriculados = int(df_filtered[col_matriculados].sum())
         ies_unicas = df_filtered["INSTITUCIÓN DE EDUCACIÓN SUPERIOR (IES)"].nunique()
         
-        # Área o programa con mayor cantidad de alumnos
         top_area_series = df_filtered.groupby(col_area)[col_matriculados].sum()
         area_top = top_area_series.idxmax() if not top_area_series.empty else "N/A"
         
-        # Calcular porcentaje de participación oficial
         total_oficial = df_filtered[df_filtered[col_sector].str.upper() == 'OFICIAL'][col_matriculados].sum() if col_sector in df_filtered.columns else 0
         part_oficial = (total_oficial / total_matriculados) * 100 if total_matriculados > 0 else 0
 
@@ -108,20 +120,15 @@ try:
 
         with col1:
             st.subheader(f"Concentración por {col_area}")
-            # Agrupar los top 10 para evitar saturar el gráfico horizontal si son muchos programas
             df_area_g = df_filtered.groupby(col_area)[col_matriculados].sum().reset_index()
             df_area_g = df_area_g.sort_values(by=col_matriculados, ascending=True).tail(12)
             df_area_g["Porcentaje"] = (df_area_g[col_matriculados] / df_area_g[col_matriculados].sum()) * 100
             
             fig_bar = px.bar(
-                df_area_g, 
-                x=col_matriculados, 
-                y=col_area, 
-                orientation='h',
+                df_area_g, x=col_matriculados, y=col_area, orientation='h',
                 text=df_area_g['Porcentaje'].apply(lambda x: f'{x:.1f}%'),
                 labels={col_matriculados: "Estudiantes", col_area: "Segmento Académico"},
-                color=col_matriculados,
-                color_continuous_scale="Blues"
+                color=col_matriculados, color_continuous_scale="Blues"
             )
             fig_bar.update_layout(showlegend=False, height=420, margin=dict(l=0, r=0, t=10, b=0))
             st.plotly_chart(fig_bar, use_container_width=True)
@@ -130,10 +137,7 @@ try:
             st.subheader("Cuota de Demanda según Sector (Público vs Privado)")
             df_sector_g = df_filtered.groupby(col_sector)[col_matriculados].sum().reset_index()
             fig_pie = px.pie(
-                df_sector_g, 
-                values=col_matriculados, 
-                names=col_sector, 
-                hole=0.4,
+                df_sector_g, values=col_matriculados, names=col_sector, hole=0.4,
                 color_discrete_sequence=["#1f77b4", "#aec7e8", "#ff7f0e"]
             )
             fig_pie.update_layout(height=420, margin=dict(l=0, r=0, t=10, b=0))
@@ -151,7 +155,6 @@ try:
 
 except Exception as e:
     st.error(f"Se detectó una inconsistencia estructural al procesar el archivo: {e}")
-    st.info("Asegúrate de que el archivo 'matriculados_bogota_2025.csv' se encuentre cerrado en Excel y ubicado en tu carpeta de Documentos.")
 
 st.markdown("---")
 st.caption("Ecosistema analítico avanzado desarrollado en Python. Datos validados del Sistema Nacional de Información de la Educación Superior (SNIES).")
