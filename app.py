@@ -33,34 +33,31 @@ try:
     df.columns = df.columns.str.strip()
     df = df.loc[:, ~df.columns.str.contains('^Unnamed')]
 
-    # Mapeo exacto de las columnas de conteo y demografía básicas
+    # Mapeo exacto de las columnas principales
     col_sector = 'SECTOR IES'
     col_sexo = 'SEXO'
     col_matriculados = 'MATRICULADOS'
     
-    # --- SOLUCIÓN DE CODIGOS: Mapeo de columnas con texto explicativo ---
-    # Buscamos columnas de texto descartando aquellas que sean puramente códigos ID numéricos
+    # Identificación inteligente y flexible de las columnas de texto descriptivo
     col_nivel_acad = next((c for c in df.columns if 'NIVEL ACADÉMICO' in c and 'CÓDIGO' not in c and 'ID' not in c), 'NIVEL ACADÉMICO')
     col_nivel_form = next((c for c in df.columns if 'NIVEL DE FORMACIÓN' in c and 'CÓDIGO' not in c and 'ID' not in c), 'NIVEL DE FORMACIÓN')
-    
-    # En la matriz SNIES, la columna con el texto de la modalidad se llama estrictamente 'METODOLOGÍA' o 'MODALIDAD'
     col_modalidad = next((c for c in df.columns if ('METODOLOGÍA' in c or 'MODALIDAD' in c) and 'CÓDIGO' not in c and 'ID' not in c), 'MODALIDAD')
     
-    # Columna de Área de Conocimiento o Programa Académico
     col_area = next((c for c in df.columns if ('CINE' in c or 'ÁREA' in c or 'AREA' in c) and 'CÓDIGO' not in c), None)
     if not col_area:
         col_area = 'PROGRAMA ACADÉMICO' if 'PROGRAMA ACADÉMICO' in df.columns else df.columns
 
-    # Forzar conversión de matrícula a número flotante/entero seguro
+    # Forzar conversión de matrícula a número seguro
     df[col_matriculados] = pd.to_numeric(df[col_matriculados], errors='coerce').fillna(0)
 
-    # Convertir a texto las columnas de filtrado para evitar decimales invisibles
-    for c in [col_sector, col_sexo, col_nivel_acad, col_nivel_form, col_modalidad, col_area]:
+    # Limpieza absoluta de tipos: Convertir columnas de análisis a texto y rellenar nulos
+    columnas_analisis = [col_sector, col_sexo, col_nivel_acad, col_nivel_form, col_modalidad, col_area]
+    for c in columnas_analisis:
         if c in df.columns:
-            df[c] = df[c].astype(str).str.strip()
+            df[c] = df[c].fillna("NO ESPECIFICA").astype(str).str.strip()
 
     # ==============================================================================
-    # 3. BARRA LATERAL (Filtros Avanzados Basados en Etiquetas de Texto)
+    # 3. BARRA LATERAL (Filtros Blindados contra Errores de Tipo)
     # ==============================================================================
     st.sidebar.header("Filtros del Modelo")
     st.sidebar.markdown("Filtre la población bajo estudio en tiempo real.")
@@ -73,28 +70,28 @@ try:
     opciones_sexo = sorted(df[col_sexo].unique().tolist())
     selected_sexo = st.sidebar.multiselect("Género / Sexo", opciones_sexo, default=opciones_sexo)
 
-    # Filtro 3: Nivel Académico (Verificando existencia en la matriz)
+    # Filtro 3: Nivel Académico
     if col_nivel_acad in df.columns:
         opciones_nivel_acad = sorted(df[col_nivel_acad].unique().tolist())
         selected_nivel_acad = st.sidebar.multiselect("Nivel Académico", opciones_nivel_acad, default=opciones_nivel_acad)
     else:
         selected_nivel_acad = []
 
-    # Filtro 4: Nivel de Formación (Universitario, Especialización, Maestría, etc.)
+    # Filtro 4: Nivel de Formación
     if col_nivel_form in df.columns:
         opciones_nivel_form = sorted(df[col_nivel_form].unique().tolist())
         selected_nivel_form = st.sidebar.multiselect("Nivel de Formación", opciones_nivel_form, default=opciones_nivel_form)
     else:
         selected_nivel_form = []
 
-    # Filtro 5: Modalidad / Metodología (Presencial, Virtual, Distancia)
+    # Filtro 5: Modalidad / Metodología
     if col_modalidad in df.columns:
         opciones_modalidad = sorted(df[col_modalidad].unique().tolist())
         selected_modalidad = st.sidebar.multiselect("Modalidad / Metodología", opciones_modalidad, default=opciones_modalidad)
     else:
         selected_modalidad = []
 
-    # --- Construcción Dinámica de la Máscara de Datos Filtrados ---
+    # --- Aplicación de filtros mediante Máscara Booleana ---
     mask = (df[col_sector].isin(selected_sector)) & (df[col_sexo].isin(selected_sexo))
     
     if col_nivel_acad in df.columns and selected_nivel_acad:
