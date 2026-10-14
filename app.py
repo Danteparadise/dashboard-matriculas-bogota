@@ -26,18 +26,22 @@ df = pd.read_csv("matriculados_bogota_2025.csv", encoding="latin-1", sep=";")
 df.columns = df.columns.str.strip()
 df = df.loc[:, ~df.columns.str.contains('^Unnamed')]
 
+# ==============================================================================
+# DEFINICIÓN MANUAL Y ESTRICTA DE COLUMNAS DE TEXTO (EVITA CÓDIGOS ID)
+# ==============================================================================
 col_ies = 'INSTITUCIÓN DE EDUCACIÓN SUPERIOR (IES)'
 col_sector = 'SECTOR IES'
 col_sexo = 'SEXO'
 col_matriculados = 'MATRICULADOS'
 
-col_nivel_acad = next((c for c in df.columns if 'NIVEL ACADÉMICO' in c and 'CÓDIGO' not in c and 'ID' not in c), 'NIVEL ACADÉMICO')
-col_nivel_form = next((c for c in df.columns if 'NIVEL DE FORMACIÓN' in c and 'CÓDIGO' not in c and 'ID' not in c), 'NIVEL DE FORMACIÓN')
-col_modalidad = next((c for c in df.columns if ('METODOLOGÍA' in c or 'MODALIDAD' in c) and 'CÓDIGO' not in c and 'ID' not in c), 'MODALIDAD')
-
-col_area = next((c for c in df.columns if ('CINE' in c or 'ÁREA' in c or 'AREA' in c) and 'CÓDIGO' not in c), None)
+# Forzar columnas que contienen el texto explicativo de la carrera o área
+col_area = next((c for c in df.columns if 'ÁREA DE CONOCIMIENTO' in c or 'AREA DE CONOCIMIENTO' in c), None)
 if not col_area:
     col_area = 'PROGRAMA ACADÉMICO' if 'PROGRAMA ACADÉMICO' in df.columns else df.columns
+
+col_nivel_acad = 'NIVEL ACADÉMICO' if 'NIVEL ACADÉMICO' in df.columns else df.columns[0]
+col_nivel_form = 'NIVEL DE FORMACIÓN' if 'NIVEL DE FORMACIÓN' in df.columns else df.columns[0]
+col_modalidad = 'MODALIDAD' if 'MODALIDAD' in df.columns else df.columns[0]
 
 df[col_matriculados] = pd.to_numeric(df[col_matriculados], errors='coerce').fillna(0)
 
@@ -52,36 +56,19 @@ st.sidebar.markdown("Modifique los parámetros para segmentar la población en t
 opciones_sector = sorted(df[col_sector].unique().tolist())
 selected_sector = st.sidebar.multiselect("Sector de la Institución", opciones_sector, default=opciones_sector)
 
-if col_nivel_acad in df.columns:
-    opciones_nivel_acad = sorted(df[col_nivel_acad].unique().tolist())
-    selected_nivel_acad = st.sidebar.multiselect("Nivel Académico", opciones_nivel_acad, default=opciones_nivel_acad)
-else:
-    selected_nivel_acad = []
+opciones_nivel_acad = sorted(df[col_nivel_acad].unique().tolist())
+selected_nivel_acad = st.sidebar.multiselect("Nivel Académico", opciones_nivel_acad, default=opciones_nivel_acad)
 
-if col_nivel_form in df.columns:
-    opciones_nivel_form = sorted(df[col_nivel_form].unique().tolist())
-    selected_nivel_form = st.sidebar.multiselect("Nivel de Formación", opciones_nivel_form, default=opciones_nivel_form)
-else:
-    selected_nivel_form = []
+opciones_nivel_form = sorted(df[col_nivel_form].unique().tolist())
+selected_nivel_form = st.sidebar.multiselect("Nivel de Formación", opciones_nivel_form, default=opciones_nivel_form)
 
-if col_modalidad in df.columns:
-    opciones_modalidad = sorted(df[col_modalidad].unique().tolist())
-    selected_modalidad = st.sidebar.multiselect("Modalidad de Estudio", opciones_modalidad, default=opciones_modalidad)
-else:
-    selected_modalidad = []
+opciones_modalidad = sorted(df[col_modalidad].unique().tolist())
+selected_modalidad = st.sidebar.multiselect("Modalidad de Estudio", opciones_modalidad, default=opciones_modalidad)
 
 opciones_sexo = sorted(df[col_sexo].unique().tolist())
 selected_sexo = st.sidebar.multiselect("Género / Sexo", opciones_sexo, default=opciones_sexo)
 
-mask = (df[col_sector].isin(selected_sector)) & (df[col_sexo].isin(selected_sexo))
-
-if col_nivel_acad in df.columns and selected_nivel_acad:
-    mask = mask & (df[col_nivel_acad].isin(selected_nivel_acad))
-if col_nivel_form in df.columns and selected_nivel_form:
-    mask = mask & (df[col_nivel_form].isin(selected_nivel_form))
-if col_modalidad in df.columns and selected_modalidad:
-    mask = mask & (df[col_modalidad].isin(selected_modalidad))
-    
+mask = (df[col_sector].isin(selected_sector)) & (df[col_sexo].isin(selected_sexo)) & (df[col_nivel_acad].isin(selected_nivel_acad)) & (df[col_nivel_form].isin(selected_nivel_form)) & (df[col_modalidad].isin(selected_modalidad))
 df_filtered = df[mask]
 
 if df_filtered.empty:
@@ -121,7 +108,7 @@ else:
         col_g1, col_g2 = st.columns(2)
         
         with col_g1:
-            st.subheader(f"Volumen y Cuota Relativa por {col_area}")
+            st.subheader("Volumen y Cuota Relativa por Área Académica")
             df_area_g = df_filtered.groupby(col_area)[col_matriculados].sum().reset_index()
             df_area_g = df_area_g.sort_values(by=col_matriculados, ascending=True).tail(10)
             df_area_g["%"] = (df_area_g[col_matriculados] / total_matriculados) * 100
@@ -129,10 +116,11 @@ else:
             fig_bar = px.bar(
                 df_area_g, x=col_matriculados, y=col_area, orientation='h',
                 text=df_area_g["%"].apply(lambda x: f'{x:.1f}%'),
-                labels={col_matriculados: "Estudiantes", col_area: "Área / Programa"},
+                labels={col_matriculados: "Estudiantes Matriculados", col_area: "Área de Conocimiento / Programa"},
                 color=col_matriculados, color_continuous_scale="Blues"
             )
-            fig_bar.update_layout(showlegend=False, height=400, margin=dict(l=0, r=0, t=10, b=0))
+            # Ajuste de márgenes para asegurar que los nombres largos de las carreras no se corten
+            fig_bar.update_layout(showlegend=False, height=450, margin=dict(l=250, r=20, t=10, b=10))
             st.plotly_chart(fig_bar, use_container_width=True)
             
         with col_g2:
@@ -144,7 +132,7 @@ else:
                 df_sector_g, values=col_matriculados, names=col_sector, hole=0.4,
                 color_discrete_sequence=["#1f77b4", "#aec7e8", "#ff7f0e", "#2ca02c"]
             )
-            fig_pie.update_layout(height=400, margin=dict(l=0, r=0, t=10, b=0))
+            fig_pie.update_layout(height=450, margin=dict(l=10, r=10, t=10, b=10))
             st.plotly_chart(fig_pie, use_container_width=True)
 
     with tab2:
@@ -159,11 +147,11 @@ else:
             
             fig_ies = px.bar(
                 df_ies_g, x=col_matriculados, y=col_ies, color=col_sector,
-                labels={col_matriculados: "Estudiantes Matriculados", col_ies: "Institución"},
+                labels={col_matriculados: "Estudiantes Matriculados", col_ies: "Institución de Educación Superior"},
                 color_discrete_map={"Oficial": "#1f77b4", "Privado": "#aec7e8", "PÚBLICA": "#1f77b4", "PRIVADA": "#aec7e8"},
                 barmode="stack"
             )
-            fig_ies.update_layout(height=480, showlegend=True)
+            fig_ies.update_layout(height=480, margin=dict(l=250, r=20, t=10, b=10), showlegend=True)
             st.plotly_chart(fig_ies, use_container_width=True)
             
         with col_ins2:
@@ -172,7 +160,8 @@ else:
             
             fig_mod = px.bar(
                 df_mod_g, x=col_modalidad, y=col_matriculados, color=col_modalidad,
-                text_auto='.2s', color_discrete_sequence=px.colors.qualitative.Pastel
+                text_auto='.2s', color_discrete_sequence=px.colors.qualitative.Pastel,
+                labels={col_matriculados: "Estudiantes", col_modalidad: "Modalidad"}
             )
             fig_mod.update_layout(height=480, showlegend=False)
             st.plotly_chart(fig_mod, use_container_width=True)
