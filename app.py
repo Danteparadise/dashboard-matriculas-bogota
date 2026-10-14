@@ -152,13 +152,13 @@ try:
             with col_g1:
                 st.subheader(f"Volumen y Cuota Relativa por {col_area}")
                 df_area_g = df_filtered.groupby(col_area)[col_matriculados].sum().reset_index()
-                df_area_g = df_area_g.sort_values(by=col_matriculados, ascending=True).tail(10) # Top 10 más específicos
+                df_area_g = df_area_g.sort_values(by=col_matriculados, ascending=True).tail(10)
                 df_area_g["%"] = (df_area_g[col_matriculados] / total_matriculados) * 100
                 
                 fig_bar = px.bar(
                     df_area_g, x=col_matriculados, y=col_area, orientation='h',
                     text=df_area_g["%"].apply(lambda x: f'{x:.1f}%'),
-                    labels={col_matriculados: "Estudiantes", col_area: "Área de Conocimiento / Programa"},
+                    labels={col_matriculados: "Estudiantes", col_area: "Área / Programa"},
                     color=col_matriculados, color_continuous_scale="Blues"
                 )
                 fig_bar.update_layout(showlegend=False, height=400, margin=dict(l=0, r=0, t=10, b=0))
@@ -182,7 +182,7 @@ try:
         with tab2:
             st.markdown("#### Análisis Específico de Captación por Institución Superior")
             
-            col_ins1, col_ins2 = st.columns([3, 2])
+            col_ins1, col_ins2 = st.columns(2)
             
             with col_ins1:
                 st.subheader("Top 15 Instituciones con Mayor Densidad de Matrícula")
@@ -191,8 +191,7 @@ try:
                 
                 fig_ies = px.bar(
                     df_ies_g, x=col_matriculados, y=col_ies, color=col_sector,
-Usa el código con precaución.
-labels={col_matriculados: "Estudiantes Matriculados", col_ies: "Institución de Educación Superior"},
+                    labels={col_matriculados: "Estudiantes Matriculados", col_ies: "Institución"},
 color_discrete_map={"Oficial": "#1f77b4", "Privado": "#aec7e8", "PÚBLICA": "#1f77b4", "PRIVADA": "#aec7e8"},
 barmode="stack"
 )
@@ -212,22 +211,14 @@ st.plotly_chart(fig_mod, use_container_width=True)
 # ----------------------------------------------------------------------
 with tab3:
 st.markdown("#### Motor de Búsqueda Avanzada y Auditoría de Datos")
-st.markdown("Use esta sección para filtrar filas por palabras clave específicas y descargar subconjuntos homogéneos para sus anexos de tesis.")
-# Filtro de texto dinámico en tiempo real
 search_query = st.text_input("🔍 Filtrar tabla por nombre de Universidad, Programa Académico o Área:", "")
 df_table_display = df_filtered[[col_ies, col_sector, col_nivel_acad, col_nivel_form, col_modalidad, col_area, col_sexo, col_matriculados]]
 if search_query:
-# Máscara para filtrar por cualquier columna de texto mediante la consulta del usuario
 search_mask = df_table_display.astype(str).apply(lambda x: x.str.contains(search_query, case=False)).any(axis=1)
 df_table_display = df_table_display[search_mask]
-# Ordenamiento corporativo
 df_table_display = df_table_display.sort_values(by=col_matriculados, ascending=False)
-# Contador de filas devueltas
-st.caption(f"Mostrando {len(df_table_display)} filas que coinciden con los criterios establecidos.")
-# Renderizado de la tabla de datos interactiva
+st.caption(f"Mostrando {len(df_table_display)} filas.")
 st.dataframe(df_table_display, use_container_width=True, hide_index=True, height=350)
-# --- FUNCIÓN DE EXPORTACIÓN DIRECTA (REQUERIMIENTO MÁSTER) ---
-# Permite al usuario o jurado descargar los datos filtrados en formato CSV para auditorías externas
 csv_data = df_table_display.to_csv(index=False, sep=";").encode('latin-1')
 st.download_button(
 label="📥 Descargar Base de Datos Filtrada (Formato CSV para Excel)",
@@ -237,6 +228,5 @@ mime="text/csv"
 )
 except Exception as e:
 st.error(f"Se detectó una inconsistencia estructural al procesar la matriz: {e}")
-st.info("Asegúrese de que el archivo 'matriculados_bogota_2025.csv' tenga los encabezados del SNIES correctos.")
 st.markdown("---")
 st.caption("Ecosistema analítico avanzado desarrollado en Python para tesis de posgrado. Datos validados del Sistema Nacional de Información de la Educación Superior (SNIES).")
