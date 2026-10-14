@@ -34,7 +34,6 @@ col_sector = 'SECTOR IES'
 col_sexo = 'SEXO'
 col_matriculados = 'MATRICULADOS'
 
-# Forzar columnas que contienen el texto explicativo de la carrera o área
 col_area = next((c for c in df.columns if 'ÁREA DE CONOCIMIENTO' in c or 'AREA DE CONOCIMIENTO' in c), None)
 if not col_area:
     col_area = 'PROGRAMA ACADÉMICO' if 'PROGRAMA ACADÉMICO' in df.columns else df.columns
@@ -197,18 +196,6 @@ else:
         
         df_table_display = df_filtered[[col_ies, col_sector, col_nivel_acad, col_nivel_form, col_modalidad, col_area, col_sexo, col_matriculados]]
         
-        if search_query:
-search_mask = df_table_display.astype(str).apply(lambda x: x.str.contains(search_query, case=False)).any(axis=1)
-df_table_display = df_table_display[search_mask]
-df_table_display = df_table_display.sort_values(by=col_matriculados, ascending=False)
-st.caption(f"Mostrando {len(df_table_display)} filas.")
-st.dataframe(df_table_display, use_container_width=True, hide_index=True, height=350)
-csv_data = df_table_display.to_csv(index=False, sep=";").encode('latin-1')
-st.download_button(
-label="📥 Descargar Base de Datos Filtrada (Formato CSV para Excel)",
-data=csv_data,
-file_name="matriculados_filtrados_bogota.csv",
-mime="text/csv"
-)
-st.markdown("---")
-st.caption("Ecosistema analítico avanzado desarrollado en Python para tesis de posgrado. Datos validados del Sistema Nacional de Información de la Educación Superior (SNIES).")
+        if search_query != "":
+            search_mask = df_table_display.astype(str).apply(lambda x: x.str.contains(search_query, case=False)).any(axis=1)
+            df_table_display = df_table_display[search_mask]
