@@ -45,18 +45,22 @@ col_modalidad = 'MODALIDAD' if 'MODALIDAD' in df.columns else df.columns
 df[col_matriculados] = pd.to_numeric(df[col_matriculados], errors='coerce').fillna(0)
 
 # ==============================================================================
-# ESTANDARIZACIÓN Y LIMPIEZA DE DATOS NO ESPECIFICADOS
+# ESTANDARIZACIÓN Y LIMPIEZA EXHAUSTIVA DE REGISTROS NO CLASIFICADOS
 # ==============================================================================
 columnas_analisis = [col_ies, col_sector, col_sexo, col_nivel_acad, col_nivel_form, col_modalidad, col_area]
 for c in columnas_analisis:
     if c in df.columns:
         df[c] = df[c].fillna("").astype(str).str.strip()
 
-# Filtrar para eliminar exclusivamente aquellos donde el área de conocimiento no esté especificada
+# Filtrado metodológico riguroso en la columna del Área de Conocimiento
 if col_area in df.columns:
     df = df[
         (df[col_area] != "") & 
         (df[col_area].str.upper() != "NO ESPECIFICA") & 
+        (df[col_area].str.upper() != "SIN INFORMACIÓN") & 
+        (df[col_area].str.upper() != "SIN INFORMACION") & 
+        (df[col_area].str.upper() != "SIN CLASIFICACIÓN") & 
+        (df[col_area].str.upper() != "SIN CLASIFICACION") & 
         (df[col_area].str.upper() != "N/A") &
         (df[col_area].str.upper() != "NAN")
     ]
@@ -85,7 +89,6 @@ df_filtered = df[mask]
 if df_filtered.empty:
     st.warning("La combinación de filtros actual no arrojó resultados. Intente flexibilizar los parámetros en la barra lateral.")
 else:
-    # Se eliminó por completo la tercera pestaña de microdatos
     tab1, tab2 = st.tabs([
         "📈 Diagnóstico Global y Tendencias", 
         "🏢 Enfoque Institucional y de Demanda"
@@ -198,7 +201,3 @@ else:
                 text_auto='.2s', color_discrete_sequence=px.colors.qualitative.Pastel,
                 labels={col_matriculados: "Estudiantes", col_modalidad: "Modalidad"}
             )
-            fig_mod.update_layout(height=480, showlegend=False)
-            st.plotly_chart(fig_mod, use_container_width=True)
-
-st.markdown("---")
