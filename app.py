@@ -44,10 +44,22 @@ col_modalidad = 'MODALIDAD' if 'MODALIDAD' in df.columns else df.columns
 
 df[col_matriculados] = pd.to_numeric(df[col_matriculados], errors='coerce').fillna(0)
 
+# ==============================================================================
+# LIMPIEZA EXCLUSIVA: ELIMINACIÓN DE REGISTROS NULOS O "NO ESPECIFICA"
+# ==============================================================================
 columnas_analisis = [col_ies, col_sector, col_sexo, col_nivel_acad, col_nivel_form, col_modalidad, col_area]
 for c in columnas_analisis:
     if c in df.columns:
-        df[c] = df[c].fillna("NO ESPECIFICA").astype(str).str.strip()
+        # Reemplazar nulos verdaderos, limpiar espacios y estandarizar a mayúsculas para filtrar
+        df[c] = df[c].fillna("").astype(str).str.strip()
+        # Filtrar filas vacías, nulas o explícitamente marcadas como "NO ESPECIFICA"
+        df = df[
+            (df[c] != "") & 
+            (df[c].str.upper() != "NO ESPECIFICA") & 
+            (df[c].str.upper() != "NO ESPECIFICA") &
+            (df[c].str.upper() != "N/A") &
+            (df[c].str.upper() != "NAN")
+        ]
 
 st.sidebar.header("🎛️ Panel de Control de Variables")
 st.sidebar.markdown("Modifique los parámetros para segmentar la población en tiempo real.")
@@ -187,15 +199,23 @@ else:
                 labels={col_matriculados: "Estudiantes", col_modalidad: "Modalidad"}
             )
             fig_mod.update_layout(height=480, showlegend=False)
-            st.plotly_chart(fig_mod, use_container_width=True)
-
-    with tab3:
-        st.markdown("#### Motor de Búsqueda Avanzada y Auditoría de Datos")
-        
-        search_query = st.text_input("🔍 Filtrar tabla por nombre de Universidad, Programa Académico o Área:", "")
-        
-        df_table_display = df_filtered[[col_ies, col_sector, col_nivel_acad, col_nivel_form, col_modalidad, col_area, col_sexo, col_matriculados]]
-        
-        if search_query != "":
-            search_mask = df_table_display.astype(str).apply(lambda x: x.str.contains(search_query, case=False)).any(axis=1)
-            df_table_display = df_table_display[search_mask]
+st.plotly_chart(fig_mod, use_container_width=True)
+with tab3:
+st.markdown("#### Motor de Búsqueda Avanzada y Auditoría de Datos")
+search_query = st.text_input("🔍 Filtrar tabla por nombre de Universidad, Programa Académico o Área:", "")
+df_table_display = df_filtered[[col_ies, col_sector, col_nivel_acad, col_nivel_form, col_modalidad, col_area, col_sexo, col_matriculados]]
+if search_query != "":
+search_mask = df_table_display.astype(str).apply(lambda x: x.str.contains(search_query, case=False)).any(axis=1)
+df_table_display = df_table_display[search_mask]
+df_table_display = df_table_display.sort_values(by=col_matriculados, ascending=False)
+st.caption(f"Mostrando {len(df_table_display)} filas.")
+st.dataframe(df_table_display, use_container_width=True, hide_index=True, height=350)
+csv_data = df_table_display.to_csv(index=False, sep=";").encode('latin-1')
+st.download_button(
+label="📥 Descargar Base de Datos Filtrada (Formato CSV para Excel)",
+data=csv_data,
+file_name="matriculados_filtrados_bogota.csv",
+mime="text/csv"
+)
+st.markdown("---")
+st.caption("Ecosistema analítico avanzado desarrollado en Python para tesis de posgrado. Datos validados del Sistema Nacional de Información de la Educación Superior (SNIES).")
