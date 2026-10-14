@@ -50,13 +50,11 @@ df[col_matriculados] = pd.to_numeric(df[col_matriculados], errors='coerce').fill
 columnas_analisis = [col_ies, col_sector, col_sexo, col_nivel_acad, col_nivel_form, col_modalidad, col_area]
 for c in columnas_analisis:
     if c in df.columns:
-        # Reemplazar nulos verdaderos, limpiar espacios y estandarizar a mayúsculas para filtrar
         df[c] = df[c].fillna("").astype(str).str.strip()
-        # Filtrar filas vacías, nulas o explícitamente marcadas como "NO ESPECIFICA"
+        # Filtrado preciso sin alterar el contenido original de las celdas
         df = df[
             (df[c] != "") & 
             (df[c].str.upper() != "NO ESPECIFICA") & 
-            (df[c].str.upper() != "NO ESPECIFICA") &
             (df[c].str.upper() != "N/A") &
             (df[c].str.upper() != "NAN")
         ]
@@ -199,3 +197,8 @@ else:
                 labels={col_matriculados: "Estudiantes", col_modalidad: "Modalidad"}
             )
             fig_mod.update_layout(height=480, showlegend=False)
+            st.plotly_chart(fig_mod, use_container_width=True)
+
+    with tab3:
+        st.markdown("#### Motor de Búsqueda Avanzada y Auditoría de Datos")
+        
