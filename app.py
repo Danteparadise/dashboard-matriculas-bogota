@@ -39,9 +39,9 @@ col_area = next((c for c in df.columns if 'ÁREA DE CONOCIMIENTO' in c or 'AREA 
 if not col_area:
     col_area = 'PROGRAMA ACADÉMICO' if 'PROGRAMA ACADÉMICO' in df.columns else df.columns
 
-col_nivel_acad = 'NIVEL ACADÉMICO' if 'NIVEL ACADÉMICO' in df.columns else df.columns[0]
-col_nivel_form = 'NIVEL DE FORMACIÓN' if 'NIVEL DE FORMACIÓN' in df.columns else df.columns[0]
-col_modalidad = 'MODALIDAD' if 'MODALIDAD' in df.columns else df.columns[0]
+col_nivel_acad = 'NIVEL ACADÉMICO' if 'NIVEL ACADÉMICO' in df.columns else df.columns
+col_nivel_form = 'NIVEL DE FORMACIÓN' if 'NIVEL DE FORMACIÓN' in df.columns else df.columns
+col_modalidad = 'MODALIDAD' if 'MODALIDAD' in df.columns else df.columns
 
 df[col_matriculados] = pd.to_numeric(df[col_matriculados], errors='coerce').fillna(0)
 
@@ -109,18 +109,42 @@ else:
         
         with col_g1:
             st.subheader("Volumen y Cuota Relativa por Área Académica")
+            
             df_area_g = df_filtered.groupby(col_area)[col_matriculados].sum().reset_index()
-            df_area_g = df_area_g.sort_values(by=col_matriculados, ascending=True).tail(10)
             df_area_g["%"] = (df_area_g[col_matriculados] / total_matriculados) * 100
             
+            df_area_presentation = df_area_g.sort_values(by=col_matriculados, ascending=False)
+            df_area_g_top10 = df_area_g.sort_values(by=col_matriculados, ascending=True).tail(10)
+            
+            with st.expander("🔬 Ver Ficha Cuantitativa por Variable (Clasificación Estadística)", expanded=True):
+                st.markdown("""
+                    Mapeo multidimensional del ecosistema de educación superior estructurado según las variables metodológicas requeridas:
+                """)
+                
+                df_maestria = df_area_presentation.rename(columns={
+                    col_area: "1. Variable Categórica (Área del Conocimiento)",
+                    col_matriculados: "2. Variable Discreta (Estudiantes Matriculados)",
+                    "%": "3. Variable Continua (% Representación por Área)"
+                })
+                
+                st.dataframe(
+                    df_maestria,
+                    column_config={
+                        "2. Variable Discreta (Estudiantes Matriculados)": st.column_config.NumberColumn(format="%d"),
+                        "3. Variable Continua (% Representación por Área)": st.column_config.NumberColumn(format="%.2f%%")
+                    },
+                    hide_index=True,
+                    use_container_width=True,
+                    height=200
+                )
+            
             fig_bar = px.bar(
-                df_area_g, x=col_matriculados, y=col_area, orientation='h',
-                text=df_area_g["%"].apply(lambda x: f'{x:.1f}%'),
+                df_area_g_top10, x=col_matriculados, y=col_area, orientation='h',
+                text=df_area_g_top10["%"].apply(lambda x: f'{x:.1f}%'),
                 labels={col_matriculados: "Estudiantes Matriculados", col_area: "Área de Conocimiento / Programa"},
                 color=col_matriculados, color_continuous_scale="Blues"
             )
-            # Ajuste de márgenes para asegurar que los nombres largos de las carreras no se corten
-            fig_bar.update_layout(showlegend=False, height=450, margin=dict(l=250, r=20, t=10, b=10))
+            fig_bar.update_layout(showlegend=False, height=400, margin=dict(l=250, r=20, t=10, b=10))
             st.plotly_chart(fig_bar, use_container_width=True)
             
         with col_g2:
@@ -174,20 +198,17 @@ else:
         df_table_display = df_filtered[[col_ies, col_sector, col_nivel_acad, col_nivel_form, col_modalidad, col_area, col_sexo, col_matriculados]]
         
         if search_query:
-            search_mask = df_table_display.astype(str).apply(lambda x: x.str.contains(search_query, case=False)).any(axis=1)
-            df_table_display = df_table_display[search_mask]
-        
-        df_table_display = df_table_display.sort_values(by=col_matriculados, ascending=False)
-        st.caption(f"Mostrando {len(df_table_display)} filas.")
-        st.dataframe(df_table_display, use_container_width=True, hide_index=True, height=350)
-        
-        csv_data = df_table_display.to_csv(index=False, sep=";").encode('latin-1')
-        st.download_button(
-            label="📥 Descargar Base de Datos Filtrada (Formato CSV para Excel)",
-            data=csv_data,
-            file_name="matriculados_filtrados_bogota.csv",
-            mime="text/csv"
-        )
-
+search_mask = df_table_display.astype(str).apply(lambda x: x.str.contains(search_query, case=False)).any(axis=1)
+df_table_display = df_table_display[search_mask]
+df_table_display = df_table_display.sort_values(by=col_matriculados, ascending=False)
+st.caption(f"Mostrando {len(df_table_display)} filas.")
+st.dataframe(df_table_display, use_container_width=True, hide_index=True, height=350)
+csv_data = df_table_display.to_csv(index=False, sep=";").encode('latin-1')
+st.download_button(
+label="📥 Descargar Base de Datos Filtrada (Formato CSV para Excel)",
+data=csv_data,
+file_name="matriculados_filtrados_bogota.csv",
+mime="text/csv"
+)
 st.markdown("---")
 st.caption("Ecosistema analítico avanzado desarrollado en Python para tesis de posgrado. Datos validados del Sistema Nacional de Información de la Educación Superior (SNIES).")
